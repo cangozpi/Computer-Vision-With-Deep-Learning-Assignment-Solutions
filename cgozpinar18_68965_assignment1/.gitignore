@@ -1,0 +1,8 @@
+mauw.ipynb
+*.swp
+*.pyc
+.env/*
+*.ipynb_checkpoints/*
+
+# gitignore the built release.
+assignment3/*

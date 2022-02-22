@@ -1,0 +1,161 @@
+from builtins import object
+import numpy as np
+
+from comp411.layers import *
+from comp411.fast_layers import *
+from comp411.layer_utils import *
+
+
+class ThreeLayerConvNet(object):
+    """
+    A three-layer convolutional network with the following architecture:
+
+    conv - leakyrelu - 2x2 max pool - affine - leakyrelu - affine - softmax
+
+    The network operates on minibatches of data that have shape (N, C, H, W)
+    consisting of N images, each with height H and width W and with C input
+    channels.
+    """
+
+    def __init__(self, input_dim=(3, 32, 32), num_filters=32, filter_size=7,
+                 hidden_dim=100, num_classes=10, weight_scale=1e-3, reg=0.0,
+                 alpha=1e-3, dtype=np.float32):
+        """
+        Initialize a new network.
+
+        Inputs:
+        - input_dim: Tuple (C, H, W) giving size of input data
+        - num_filters: Number of filters to use in the convolutional layer
+        - filter_size: Width/height of filters to use in the convolutional layer
+        - hidden_dim: Number of units to use in the fully-connected hidden layer
+        - num_classes: Number of scores to produce from the final affine layer.
+        - weight_scale: Scalar giving standard deviation for random initialization
+          of weights.
+        - reg: Scalar giving L2 regularization strength
+        - alpha: negative slope of Leaky ReLU layers
+        - dtype: numpy datatype to use for computation.
+        """
+        self.params = {}
+        self.reg = reg
+        self.dtype = dtype
+        self.alpha = alpha
+
+        ############################################################################
+        # TODO: Initialize weights and biases for the three-layer convolutional    #
+        # network. Weights should be initialized from a Gaussian centered at 0.0   #
+        # with standard deviation equal to weight_scale; biases should be          #
+        # initialized to zero. All weights and biases should be stored in the      #
+        #  dictionary self.params. Store weights and biases for the convolutional  #
+        # layer using the keys 'W1' and 'b1'; use keys 'W2' and 'b2' for the       #
+        # weights and biases of the hidden affine layer, and keys 'W3' and 'b3'    #
+        # for the weights and biases of the output affine layer.                   #
+        #                                                                          #
+        # IMPORTANT: For this assignment, you can assume that the padding          #
+        # and stride of the first convolutional layer are chosen so that           #
+        # **the width and height of the input are preserved**. Take a look at      #
+        # the start of the loss() function to see how that happens.                #
+        ############################################################################
+        # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+        C = input_dim[0] # channel
+
+        self.params['W1'] = (np.random.randn(num_filters, C, filter_size, filter_size) * weight_scale).astype(dtype)
+        self.params['b1'] = np.zeros((num_filters)).astype(dtype)
+
+        max_output_dim = int(input_dim[1]*input_dim[2] / 4) # dimension after 2x2 max pooling with stride of 2 = ((D-2)/2) + 1 = D/2 
+        self.params['W2'] = (np.random.randn(num_filters * max_output_dim, hidden_dim) * weight_scale).astype(dtype)
+        self.params['b2'] = np.zeros((hidden_dim)).astype(dtype)
+
+        
+        self.params['W3'] = (np.random.randn(hidden_dim, num_classes) * weight_scale).astype(dtype)
+        self.params['b3'] = np.zeros((num_classes)).astype(dtype)
+
+        # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        ############################################################################
+        #                             END OF YOUR CODE                             #
+        ############################################################################
+
+        for k, v in self.params.items():
+            self.params[k] = v.astype(dtype)
+
+
+    def loss(self, X, y=None):
+        """
+        Evaluate loss and gradient for the three-layer convolutional network.
+
+        Input / output: Same API as TwoLayerNet in fc_net.py.
+        """
+        W1, b1 = self.params['W1'], self.params['b1']
+        W2, b2 = self.params['W2'], self.params['b2']
+        W3, b3 = self.params['W3'], self.params['b3']
+
+        # pass conv_param to the forward pass for the convolutional layer
+        # Padding and stride chosen to preserve the input spatial size
+        filter_size = W1.shape[2]
+        conv_param = {'stride': 1, 'pad': (filter_size - 1) // 2}
+
+        # pass pool_param to the forward pass for the max-pooling layer
+        pool_param = {'pool_height': 2, 'pool_width': 2, 'stride': 2}
+
+        scores = None
+        ############################################################################
+        # TODO: Implement the forward pass for the three-layer convolutional net,  #
+        # computing the class scores for X and storing them in the scores          #
+        # variable.                                                                #
+        #                                                                          #
+        # Remember you can use the functions defined in comp411/fast_layers.py and  #
+        # comp411/layer_utils.py in your implementation (already imported).         #
+        ############################################################################
+        # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        lrelu_param = {"alpha": self.alpha}
+        
+        # pass forward conv-LeakyReLU- MaxPool layers
+        conv_lrelu_pool_out, conv_lrelu_pool_cache = conv_lrelu_pool_forward(X, W1, b1, conv_param, lrelu_param=lrelu_param, pool_param=pool_param)
+        # pass forward FC-LeakyReLU layers
+        fc_lrelu_out, fc_lrelu_cache = affine_lrelu_forward(conv_lrelu_pool_out, W2, b2, lrelu_param)
+        # pass forward classification FC layer
+        scores, scores_cache = affine_forward(fc_lrelu_out, W3, b3)
+
+        # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        ############################################################################
+        #                             END OF YOUR CODE                             #
+        ############################################################################
+
+        if y is None:
+            return scores
+
+        loss, grads = 0, {}
+        ############################################################################
+        # TODO: Implement the backward pass for the three-layer convolutional net, #
+        # storing the loss and gradients in the loss and grads variables. Compute  #
+        # data loss using softmax, and make sure that grads[k] holds the gradients #
+        # for self.params[k]. Don't forget to add L2 regularization!               #
+        #                                                                          #
+        # NOTE: To ensure that your implementation matches ours and you pass the   #
+        # automated tests, make sure that your L2 regularization includes a factor #
+        # of 0.5 to simplify the expression for the gradient.                      #
+        ############################################################################
+        # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+        # calculate softmax loss(a.k.a softmax - categorical entropy loss)
+        loss, dsoftmax = softmax_loss(scores, y)
+        loss += (0.5 * (self.reg * (np.sum(W1*W1) + np.sum(W2*W2) + np.sum(W3*W3)))) # apply regularization
+
+        # apply backpropagation
+        dfc, dw3, db3 = affine_backward(dsoftmax, scores_cache)
+        grads['W3'] = (dw3 + (self.reg * W3)) # add regularization derivatives too
+        grads['b3'] = db3
+        dpool, dw2, db2 = affine_lrelu_backward(dfc, fc_lrelu_cache)
+        grads['W2'] = (dw2 + (self.reg * W2)) # add regularization derivatives too
+        grads['b2'] = db2
+        dx, dw1, db1 = conv_lrelu_pool_backward(dpool, conv_lrelu_pool_cache)
+        grads['W1'] = (dw1 + (self.reg * W1)) # add regularization derivatives too
+        grads['b1'] = db1
+
+        
+        # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        ############################################################################
+        #                             END OF YOUR CODE                             #
+        ############################################################################
+
+        return loss, grads
